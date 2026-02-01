@@ -50,23 +50,23 @@ def handle_path(route, path, args):
     if len(parts) == 2:
         ## Verifica se há parâmetros de consulta
         if args == {}:
-            count = len(all_data)
-            return jsonify(paginate(all_data, int(args.get('page', 1)), count))
+            all_data = resume_response_list(all_data, route)
+            return jsonify(paginate(all_data, 1))
         else:
             filtered_data = []
 
             match route:
                 case 'planets':
-                    filter_planets(filtered_data, all_data, args)
+                    filtered_data = filter_planets(all_data, args)
                 case 'people':
-                    filter_people(filtered_data, all_data, args)
+                    filtered_data = filter_people(all_data, args)
                 case 'films':
-                    filter_films(filtered_data, all_data, args)
+                    filtered_data = filter_films(all_data, args)
                 case 'starships':
-                    filter_starships(filtered_data, all_data, args)
+                    filtered_data = filter_starships(all_data, args)
 
-            count = len(filtered_data)
-            return jsonify(paginate(filtered_data, int(args.get('page', 1)), count))
+            filtered_data = resume_response_list(filtered_data, route)
+            return jsonify(paginate(filtered_data, int(args.get('page', 1))))
     
     ## Verifica se o path tem três partes, como: /planets/1 ou /people/5...
     elif len(parts) == 3 :
@@ -81,6 +81,7 @@ def handle_path(route, path, args):
                     break
                 
             if data:
+                data = resume_response(data, route)
                 return jsonify(data)
             else:
                 return jsonify({'error': 'Recurso nao encontrado.'}), 404
@@ -88,10 +89,12 @@ def handle_path(route, path, args):
             return jsonify({'error': 'ID invalido.'}), 400
 
 ## Função para filtrar planetas com base em nome, terreno e clima
-def filter_planets(filtered_data, all_data, args):
+def filter_planets(all_data, args):
     arg_name = args.get('name', '').lower()
     arg_terrain = args.get('terrain', '').lower()
     arg_climate = args.get('climate', '').lower()
+
+    filtered_data = []
 
     ## Lógica para aplicar multiplos filtros
     for data in all_data:
@@ -100,11 +103,15 @@ def filter_planets(filtered_data, all_data, args):
             arg_climate in data['climate'].lower()):
             filtered_data.append(data)
 
+    return filtered_data
+
 ## Função para filtrar pessoas com base em nome, gênero e filme
-def filter_people(filtered_data, all_data, args):
+def filter_people(all_data, args):
     arg_name = args.get('name', '').lower()
     arg_gender = args.get('gender', '').lower()
     arg_film = args.get('film', '').lower()
+
+    filtered_data = []
 
     ## Lógica para aplicar multiplos filtros
     for data in all_data:
@@ -119,12 +126,15 @@ def filter_people(filtered_data, all_data, args):
                         break
             else:
                 filtered_data.append(data)
+    return filtered_data
 
 ## Função para filtrar filmes com base em título, personagem e ano de lançamento
-def filter_films(filtered_data, all_data, args):
+def filter_films(all_data, args):
     arg_title = args.get('title', '').lower()
     arg_character = args.get('character', '').lower()
     arg_year = args.get('year', '').lower()
+
+    filtered_data = []
 
     ## Lógica para aplicar multiplos filtros
     for data in all_data:
@@ -139,12 +149,15 @@ def filter_films(filtered_data, all_data, args):
                         break
             else:
                 filtered_data.append(data)
+    return filtered_data
 
 ## Função para filtrar naves espaciais com base em nome, modelo e piloto
-def filter_starships(filtered_data, all_data, args):
+def filter_starships(all_data, args):
     arg_name = args.get('name', '').lower()
     arg_model = args.get('model', '').lower()
     arg_pilot = args.get('pilot', '').lower()
+
+    filtered_data = []
 
     ## Lógica para aplicar multiplos filtros
     for data in all_data:
@@ -159,6 +172,7 @@ def filter_starships(filtered_data, all_data, args):
                         break
             else:
                 filtered_data.append(data)
+    return filtered_data
 
 ## Função para buscar todos os dados de um recurso e armazenar em cache
 def fetch_all(resource):
@@ -189,7 +203,7 @@ def fetch_all(resource):
         print(f"Cache de {resource} atualizado.")
 
 ## Função para paginar os dados e retornar links para próximas páginas e anteriores
-def paginate(data, page, count):
+def paginate(data, page):
     items_per_page = 10
     start = (page - 1) * items_per_page
     end = page * items_per_page
@@ -202,6 +216,7 @@ def paginate(data, page, count):
     if start > 0:
         previous_page = page - 1
 
+    count = len(data)
     data = data[start:end]
 
     return {
@@ -210,3 +225,69 @@ def paginate(data, page, count):
         'next_page': '?page=' + str(next_page) if next_page else None,
         'previous_page': '?page=' + str(previous_page) if previous_page else None
     }
+
+## Função para resumir a resposta dos dados em lista
+def resume_response_list(all_data, route):
+    resumes = []
+    for item in all_data:
+        resumes.append(resume_response(item, route))
+    return resumes
+
+## Função para resumir a resposta de um único item
+def resume_response(data, route):
+    if route == 'planets':
+        resume = {}
+        resume['name'] = data['name']
+        resume['terrain'] = data['terrain']
+        resume['climate'] = data['climate']
+        resume['population'] = data['population']
+        resume['id'] = data['url'].split('/')[-2]
+        return resume
+
+    elif route == 'people':
+        resume = {}
+        resume['name'] = data['name']
+        resume['gender'] = data['gender']
+        resume['birth_year'] = data['birth_year']
+        
+        ## Extrai os IDs dos filmes
+        films = ''
+        for film in data['films']:
+            films += film.split('/')[-2] + ', '
+        films = films.rstrip(', ')
+        resume['films'] = films
+
+        resume['id'] = data['url'].split('/')[-2]
+        return resume
+    
+    elif route == 'films':
+        resume = {}
+        resume['title'] = data['title']
+        resume['episode_id'] = data['episode_id']
+        resume['release_date'] = data['release_date']
+        
+        ## Extrai os IDs dos personagens
+        characters = ''
+        for character in data['characters']:
+            characters += character.split('/')[-2] + ', '
+        characters = characters.rstrip(', ')
+        resume['characters'] = characters
+
+        resume['id'] = data['url'].split('/')[-2]
+        return resume
+    
+    elif route == 'starships':
+        resume = {}
+        resume['name'] = data['name']
+        resume['model'] = data['model']
+        resume['manufacturer'] = data['manufacturer']
+        
+        ## Extrai os IDs dos pilotos
+        pilots = ''
+        for pilot in data['pilots']:
+            pilots += pilot.split('/')[-2] + ', '
+        pilots = pilots.rstrip(', ')
+        resume['pilots'] = pilots
+
+        resume['id'] = data['url'].split('/')[-2]
+        return resume
