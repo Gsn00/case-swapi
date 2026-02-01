@@ -3,6 +3,38 @@ from flask import jsonify
 import requests
 import time
 
+"""
+Estrutura geral da aplicação:
+
+- hello_http(request)
+    Ponto de entrada da API (Cloud Functions).
+    Responsável por validar o método HTTP, identificar a rota
+    e delegar o processamento para a função handle_path.
+
+- handle_path(route, path, args)
+    Centraliza o tratamento das rotas (/planets, /people, /films, /starships).
+    Garante que o cache esteja atualizado, decide entre listagem, filtragem
+    ou busca por ID e coordena paginação e formatação do response.
+
+- fetch_all(resource)
+    Responsável por consumir a SWAPI e manter um cache em memória
+    com controle de expiração (TTL), reduzindo chamadas externas
+    e melhorando a performance da API.
+
+- filter_*()
+    Conjunto de funções responsáveis pela aplicação de filtros múltiplos
+    via query params, mantendo a lógica de negócio isolada e reutilizável.
+
+- paginate(data, page)
+    Aplica paginação manual sobre os resultados filtrados,
+    retornando informações de navegação (próxima e página anterior).
+
+- resume_response() / resume_response_list()
+    Responsáveis por transformar os dados originais da SWAPI
+    em responses resumidos (DTO), evitando o envio de informações
+    desnecessárias ao cliente e reduzindo o payload.
+"""
+
 # Cache simples em memória
 CACHE = {
     'planets': {'data': None, 'timestamp': None},
